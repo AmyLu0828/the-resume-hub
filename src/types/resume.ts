@@ -61,6 +61,9 @@ export interface UpdateMessage {
   entryId: string;
   changeType: 'add' | 'update' | 'delete';
   content: any;
+  // When true, the frontend should trigger an incremental LaTeX regeneration
+  // This allows saving form changes without regenerating on every keystroke
+  triggerLatex?: boolean;
 }
 
 export interface PolishRequest {

@@ -20,15 +20,16 @@ export function CustomSectionsSection({ data, onUpdate }: CustomSectionsSectionP
       title: '',
       content: ''
     };
-    
+
     const updatedSections = [...sections, newSection];
     setSections(updatedSections);
-    
+
     onUpdate({
       section: 'customSections',
       entryId: newSection.id,
       changeType: 'add',
-      content: newSection
+      content: newSection,
+      triggerLatex: true,
     });
   };
 
@@ -37,14 +38,15 @@ export function CustomSectionsSection({ data, onUpdate }: CustomSectionsSectionP
       section.id === id ? { ...section, [field]: value } : section
     );
     setSections(updatedSections);
-    
+
     const updatedSection = updatedSections.find(s => s.id === id);
     if (updatedSection) {
       onUpdate({
         section: 'customSections',
         entryId: id,
         changeType: 'update',
-        content: updatedSection
+        content: updatedSection,
+        triggerLatex: false,
       });
     }
   };
@@ -52,12 +54,13 @@ export function CustomSectionsSection({ data, onUpdate }: CustomSectionsSectionP
   const deleteSection = (id: string) => {
     const updatedSections = sections.filter(section => section.id !== id);
     setSections(updatedSections);
-    
+
     onUpdate({
       section: 'customSections',
       entryId: id,
       changeType: 'delete',
-      content: null
+      content: null,
+      triggerLatex: true,
     });
   };
 
@@ -80,7 +83,7 @@ export function CustomSectionsSection({ data, onUpdate }: CustomSectionsSectionP
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <div className="space-y-3">
               <Input
                 placeholder="Section Title (e.g., Projects, Certifications, Awards)"
@@ -88,7 +91,7 @@ export function CustomSectionsSection({ data, onUpdate }: CustomSectionsSectionP
                 onChange={(e) => updateSection(section.id, 'title', e.target.value)}
                 className="font-medium transition-smooth focus:ring-2 focus:ring-accent/20"
               />
-              
+
               <Textarea
                 placeholder="Section content..."
                 value={section.content}
@@ -100,7 +103,7 @@ export function CustomSectionsSection({ data, onUpdate }: CustomSectionsSectionP
           </div>
         </Card>
       ))}
-      
+
       <Button
         onClick={addSection}
         variant="outline"

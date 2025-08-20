@@ -33,14 +33,15 @@ export function ContactSection({ data, onUpdate }: ContactSectionProps) {
         id: `contact_${Date.now()}`,
         ...newContact
       };
-      
+
       onUpdate({
         section: 'contact',
         entryId: contact.id,
         changeType: 'add',
-        content: contact
+        content: contact,
+        triggerLatex: true,
       });
-      
+
       setNewContact({ type: '', value: '' });
     }
   };
@@ -53,7 +54,8 @@ export function ContactSection({ data, onUpdate }: ContactSectionProps) {
         section: 'contact',
         entryId: id,
         changeType: 'update',
-        content: updated
+        content: updated,
+        triggerLatex: false,
       });
     }
   };
@@ -63,7 +65,8 @@ export function ContactSection({ data, onUpdate }: ContactSectionProps) {
       section: 'contact',
       entryId: id,
       changeType: 'delete',
-      content: null
+      content: null,
+      triggerLatex: true,
     });
   };
 

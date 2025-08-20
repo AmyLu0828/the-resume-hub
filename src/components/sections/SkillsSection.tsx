@@ -21,14 +21,15 @@ export function SkillsSection({ data, onUpdate }: SkillsSectionProps) {
         id: `skill_${Date.now()}`,
         skill: newSkill.trim()
       };
-      
+
       onUpdate({
         section: 'skills',
         entryId: skill.id,
         changeType: 'add',
-        content: skill
+        content: skill,
+        triggerLatex: true,
       });
-      
+
       setNewSkill('');
     }
   };
@@ -38,7 +39,8 @@ export function SkillsSection({ data, onUpdate }: SkillsSectionProps) {
       section: 'skills',
       entryId: id,
       changeType: 'delete',
-      content: null
+      content: null,
+      triggerLatex: true,
     });
   };
 
@@ -50,7 +52,8 @@ export function SkillsSection({ data, onUpdate }: SkillsSectionProps) {
         section: 'skills',
         entryId: id,
         changeType: 'update',
-        content: updated
+        content: updated,
+        triggerLatex: false,
       });
     }
   };
@@ -62,9 +65,9 @@ export function SkillsSection({ data, onUpdate }: SkillsSectionProps) {
         <Card className="p-4 transition-smooth">
           <div className="flex flex-wrap gap-2">
             {data.map((skill) => (
-              <Badge 
-                key={skill.id} 
-                variant="secondary" 
+              <Badge
+                key={skill.id}
+                variant="secondary"
                 className="text-sm py-2 px-3 transition-smooth hover:bg-primary hover:text-primary-foreground cursor-pointer group"
               >
                 <Input

@@ -30,7 +30,21 @@ export function AboutMeSection({ data, onUpdate, onPolish, isPolishing }: AboutM
       content: {
         description,
         polishedDescription: data.polishedDescription
-      }
+      },
+      triggerLatex: false,
+    });
+  };
+
+  const handleSubmit = () => {
+    onUpdate({
+      section: 'aboutMe',
+      entryId: 'about',
+      changeType: 'update',
+      content: {
+        description: data.description,
+        polishedDescription: data.polishedDescription
+      },
+      triggerLatex: true,
     });
   };
 
@@ -115,6 +129,15 @@ export function AboutMeSection({ data, onUpdate, onPolish, isPolishing }: AboutM
                 Polish
               </>
             )}
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={!data.description.trim()}
+            className="text-xs"
+          >
+            Submit About Me
           </Button>
         </div>
       </div>

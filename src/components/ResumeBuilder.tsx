@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { NameSection } from './sections/NameSection';
 import { AboutMeSection } from './sections/AboutMeSection';
 import { EducationSection } from './sections/EducationSection';
@@ -11,7 +10,7 @@ import { SkillsSection } from './sections/SkillsSection';
 import { CustomSectionsSection } from './sections/CustomSectionsSection';
 import { PDFPreview } from './PDFPreview';
 import { ResumeData, UpdateMessage } from '@/types/resume';
-import { FileText, User, GraduationCap, Briefcase, Phone, Code, Settings, Download } from 'lucide-react';
+import { FileText, User, GraduationCap, Briefcase, Phone, Code, Settings } from 'lucide-react';
 
 const initialData: ResumeData = {
   name: { firstName: '', lastName: '' },
@@ -25,10 +24,17 @@ const initialData: ResumeData = {
 
 export function ResumeBuilder() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialData);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [isPolishing, setIsPolishing] = useState<string | null>(null); // Track which section is being polished
+  const [isPolishing, setIsPolishing] = useState<string | null>(null);
 
-  const handleUpdate = (update: UpdateMessage) => {
+  // Track the last update for incremental LaTeX generation
+  const [lastUpdate, setLastUpdate] = useState<{
+    section: string;
+    entryId: string;
+    changeType: string;
+    timestamp: number;
+  } | null>(null);
+
+  const handleUpdate = useCallback((update: UpdateMessage) => {
     setResumeData(prev => {
       const newData = { ...prev };
 
@@ -94,9 +100,23 @@ export function ResumeBuilder() {
       return newData;
     });
 
-    // Store update for potential backend sync (not sending immediately)
-    console.log('Update stored locally:', update);
-  };
+    // Track this update for incremental LaTeX generation only when requested
+    if (update.triggerLatex) {
+      setLastUpdate({
+        section: update.section,
+        entryId: update.entryId || `${update.section}_${Date.now()}`,
+        changeType: update.changeType,
+        timestamp: Date.now()
+      });
+
+      console.log('Incremental LaTeX trigger:', {
+        section: update.section,
+        changeType: update.changeType,
+        entryId: update.entryId
+      });
+    }
+
+  }, []);
 
   const handlePolish = async (section: string, entryId: string, content: any) => {
     setIsPolishing(entryId);
@@ -111,7 +131,7 @@ export function ResumeBuilder() {
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Polish failed');
 
-      // Normalize backend payload: sometimes returns the whole envelope with a nested `content`
+      // Normalize backend payload
       const envelope = data.improvedContent ?? data.content ?? data;
       const normalized = envelope && typeof envelope === 'object' && 'content' in envelope
         ? envelope.content
@@ -129,7 +149,7 @@ export function ResumeBuilder() {
           case 'aboutMe': {
             if (improvedText) {
               newData.aboutMe.polishedDescription = improvedText;
-              newData.aboutMe.description = improvedText; // show immediately in textarea
+              newData.aboutMe.description = improvedText;
             }
             break;
           }
@@ -137,7 +157,7 @@ export function ResumeBuilder() {
             const i = newData.education.findIndex(e => e.id === entryId);
             if (i >= 0 && improvedText) {
               newData.education[i].polishedDescription = improvedText;
-              newData.education[i].description = improvedText; // show immediately
+              newData.education[i].description = improvedText;
             }
             break;
           }
@@ -145,7 +165,7 @@ export function ResumeBuilder() {
             const i = newData.experience.findIndex(e => e.id === entryId);
             if (i >= 0 && improvedText) {
               newData.experience[i].polishedDescription = improvedText;
-              newData.experience[i].description = improvedText; // show immediately
+              newData.experience[i].description = improvedText;
             }
             break;
           }
@@ -154,7 +174,7 @@ export function ResumeBuilder() {
             if (i >= 0) {
               const improvedContentText = normalized?.content ?? improvedText;
               if (improvedContentText) {
-                newData.customSections[i].content = improvedContentText; // show immediately
+                newData.customSections[i].content = improvedContentText;
               }
             }
             break;
@@ -165,34 +185,19 @@ export function ResumeBuilder() {
 
         return newData;
       });
+
+      // Track polishing as an update for LaTeX regeneration
+      setLastUpdate({
+        section: section,
+        entryId: entryId,
+        changeType: 'update',
+        timestamp: Date.now()
+      });
+
     } catch (error) {
       console.error('Error polishing content:', error);
     } finally {
       setIsPolishing(null);
-    }
-  };
-
-  const handleGeneratePDF = async () => {
-    setIsGeneratingPDF(true);
-    try {
-      // TODO: Send resumeData to backend for PDF generation
-      console.log('Sending resume data to backend for PDF generation:', resumeData);
-
-      // TODO: Replace this with actual API call
-      // const response = await fetch('/api/generate-pdf', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(resumeData)
-      // });
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      console.log('PDF generation completed (placeholder)');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-    } finally {
-      setIsGeneratingPDF(false);
     }
   };
 
@@ -214,30 +219,12 @@ export function ResumeBuilder() {
             </div>
           </div>
           <p className="text-muted-foreground text-xl max-w-3xl mx-auto leading-relaxed">
-            Create professional resumes with AI assistance. Fill in your information and watch your resume come to life in real-time.
+            Create professional resumes with AI assistance and live LaTeX preview.
+            Changes appear instantly with incremental updates.
           </p>
         </div>
 
-        {/* Generate PDF Button */}
-        <div className="mb-6 text-center">
-          <Button
-            onClick={handleGeneratePDF}
-            disabled={isGeneratingPDF}
-            className="bg-gradient-primary hover:opacity-90 transition-smooth px-8 py-3 text-lg"
-          >
-            {isGeneratingPDF ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Generating PDF...
-              </>
-            ) : (
-              <>
-                <Download className="h-5 w-5 mr-2" />
-                Generate PDF
-              </>
-            )}
-          </Button>
-        </div>
+
 
         {/* Two-column layout */}
         <div className="grid lg:grid-cols-2 gap-8 h-[calc(100vh-300px)]">
@@ -248,6 +235,12 @@ export function ResumeBuilder() {
                 <div className="flex items-center gap-3 pb-4 border-b">
                   <User className="h-5 w-5 text-primary" />
                   <h2 className="text-xl font-semibold">Resume Information</h2>
+                  {lastUpdate && (
+                    <div className="ml-auto text-xs text-green-600 flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                      Live Updates Active
+                    </div>
+                  )}
                 </div>
 
                 <NameSection
@@ -314,9 +307,12 @@ export function ResumeBuilder() {
             </ScrollArea>
           </Card>
 
-          {/* Right column - PDF preview */}
+          {/* Right column - PDF preview with incremental updates */}
           <Card className="p-6 shadow-medium">
-            <PDFPreview data={resumeData} />
+            <PDFPreview
+              data={resumeData}
+              lastUpdate={lastUpdate}
+            />
           </Card>
         </div>
       </div>

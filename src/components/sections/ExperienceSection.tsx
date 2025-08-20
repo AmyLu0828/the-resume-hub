@@ -53,7 +53,8 @@ export function ExperienceSection({ data, onUpdate, onPolish, isPolishing }: Exp
         section: 'experience',
         entryId: experience.id,
         changeType: 'add',
-        content: experience
+        content: experience,
+        triggerLatex: true,
       });
 
       setNewExperience({
@@ -75,7 +76,8 @@ export function ExperienceSection({ data, onUpdate, onPolish, isPolishing }: Exp
         section: 'experience',
         entryId: id,
         changeType: 'update',
-        content: updated
+        content: updated,
+        triggerLatex: false,
       });
     }
   };
@@ -85,7 +87,8 @@ export function ExperienceSection({ data, onUpdate, onPolish, isPolishing }: Exp
       section: 'experience',
       entryId: id,
       changeType: 'delete',
-      content: null
+      content: null,
+      triggerLatex: true,
     });
   };
 

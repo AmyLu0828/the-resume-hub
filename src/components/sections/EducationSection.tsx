@@ -50,7 +50,8 @@ export function EducationSection({ data, onUpdate, onPolish, isPolishing }: Educ
         section: 'education',
         entryId: education.id,
         changeType: 'add',
-        content: education
+        content: education,
+        triggerLatex: true,
       });
 
       setNewEducation({
@@ -71,7 +72,8 @@ export function EducationSection({ data, onUpdate, onPolish, isPolishing }: Educ
         section: 'education',
         entryId: id,
         changeType: 'update',
-        content: updated
+        content: updated,
+        triggerLatex: false,
       });
     }
   };
@@ -81,7 +83,8 @@ export function EducationSection({ data, onUpdate, onPolish, isPolishing }: Educ
       section: 'education',
       entryId: id,
       changeType: 'delete',
-      content: null
+      content: null,
+      triggerLatex: true,
     });
   };
 
