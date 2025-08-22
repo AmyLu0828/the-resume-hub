@@ -101,13 +101,14 @@ async def generate_latex_endpoint(request: dict):
     """
     Generate LaTeX code (full or incremental)
     
-    Request format:
-    {
-        "type": "full" | "incremental",
-        "data": ResumeData,
-        "update": UpdateRequest (for incremental),
-        "currentLatex": str (for incremental)
-    }
+    request_data: Dictionary with format:
+        {
+           "type": "full" | "incremental",
+            "data": ResumeData,
+            "update": UpdateRequest (for incremental),
+            "currentLatex": str (for incremental),
+            "template_path": str (required)
+        }
     """
     try:
         result = await generate_latex(request)

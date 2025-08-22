@@ -52,7 +52,7 @@ class TemplateAnalysisResult(BaseModel):
     analysis_notes: Optional[str] = None
     error: Optional[str] = None
 
-system_prompt = """
+system_prompt = r"""
 You are an expert LaTeX template analyzer. Your job is to analyze LaTeX template files and extract their structure, patterns, and formatting rules to create a comprehensive template schema.
 
 **Your Task:**
@@ -107,7 +107,6 @@ class TemplateParserAgent:
         self.template_cache = {}
     
     def ensure_url_package(self, packages: List[str]) -> List[str]:
-        """Ensure \usepackage{url} is included in packages"""
         url_variants = ['url', '{url}', '\\usepackage{url}']
         has_url = any(any(variant in pkg for variant in url_variants) for pkg in packages)
         
@@ -241,6 +240,7 @@ class TemplateParserAgent:
             with open(file_path, 'r', encoding='utf-8') as file:
                 latex_content = file.read()
             
+            print(latex_content)
             template_name = os.path.splitext(os.path.basename(file_path))[0]
             return await self.analyze_template(latex_content, template_name)
             
@@ -299,7 +299,7 @@ async def parse_template_file(file_path: str) -> Dict[str, Any]:
         }
 
 # Sample usage and testing
-sample_latex = """
+sample_latex = r"""
 \\documentclass[11pt,a4paper]{article}
 \\usepackage[left=0.75in,top=0.6in,right=0.75in,bottom=0.6in]{geometry}
 \\usepackage{hyperref}
@@ -310,15 +310,18 @@ sample_latex = """
 \\end{document}
 """
 
-# Uncomment for testing
-# async def test_parser():
-#     result = await parse_template(sample_latex, "Simple Template")
-#     print("Success:", result.get("success"))
-#     if result.get("success"):
-#         schema = result.get("template_schema")
-#         print("Packages:", schema.get("packages"))
-#         print("Sections:", [s.get("name") for s in schema.get("sections", [])])
+async def test_parser():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    template_path = os.path.join(current_dir, "..", "templates", "default_resume.tex")
+    result = await parse_template_file(template_path)
+    print(result)
+    #result = await parse_template(sample_latex, "Simple Template")
+    print("Success:", result.get("success"))
+    if result.get("success"):
+        schema = result.get("template_schema")
+        print("Packages:", schema.get("packages"))
+        print("Sections:", [s.get("name") for s in schema.get("sections", [])])
 
-# if __name__ == "__main__":
-#     import asyncio
-#     asyncio.run(test_parser())
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_parser())

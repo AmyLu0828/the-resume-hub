@@ -38,14 +38,26 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
     console.log("Starting full LaTeX initialization...");
     setIsUpdating(true);
     setError(null);
-
+    
+    // Generate LaTeX code (full or incremental)
+    
+    // request_data: Dictionary with format:
+    //     {
+    //        "type": "full" | "incremental",
+    //         "data": ResumeData,
+    //         "update": UpdateRequest (for incremental),
+    //         "currentLatex": str (for incremental),
+    //         "template_path": str (required)
+    //     }
+    
     try {
       const response = await fetch('/api/generate-latex', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'full',
-          data: data
+          data: data,
+          template_path: "templates/default_resume.tex"
         }),
       });
 
@@ -103,7 +115,8 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
           type: 'incremental',
           update: updateInfo,
           currentLatex: latexCode,
-          data: data
+          data: data,
+          template_path: "templates/default_resume.tex"
         }),
       });
 

@@ -1,7 +1,7 @@
 """
 LaTeX Generator Agent for Resume Builder
 Uses Pydantic AI to generate and incrementally update LaTeX code for resume sections.
-Processes update messages from the frontend and maintains LaTeX state.
+Works with parsed templates from simple_template_parser_agent for consistent formatting.
 """
 
 from pydantic import BaseModel, Field
@@ -19,12 +19,15 @@ load_dotenv()
 
 model = OpenAIModel('gpt-4o-mini', provider=OpenAIProvider(base_url=os.environ.get('BASE_URL')))
 
+# Import the template parser agent
+from .simple_template_parser_agent import analyze_template_file
+
 # Define data models for resume sections
 class NameData(BaseModel):
     firstName: Optional[str] = ""
     lastName: Optional[str] = ""
 
-class AboutMeData(BaseModel):
+class AboutMeData(BaseModel): 
     description: Optional[str] = ""
     polishedDescription: Optional[str] = ""
 
@@ -82,106 +85,82 @@ class LaTeXGenerationRequest(BaseModel):
     data: ResumeData
     update: Optional[UpdateRequest] = None
     currentLatex: Optional[str] = None
+    template_path: Optional[str] = None  # Path to template file
 
 class LaTeXGenerationResult(BaseModel):
     success: bool
     latexCode: str
     sections: Optional[Dict[str, str]] = None
     updatedSections: Optional[Dict[str, str]] = None
+    template_used: Optional[str] = None
     error: Optional[str] = None
 
-# LaTeX Template Components
-LATEX_HEADER = r"""
-\documentclass[11pt,a4paper]{article}
-\usepackage[left=0.75in,top=0.6in,right=0.75in,bottom=0.6in]{geometry}
-\usepackage{hyperref}
-\usepackage{titlesec}
-\usepackage{xcolor}
-\usepackage{url}
-
-% Custom formatting
-\titleformat{\section}{\large\bfseries\uppercase}{}{0em}{}[\titlerule]
-\titlespacing{\section}{0pt}{12pt}{6pt}
-
-\pagestyle{empty}
-\setlength{\tabcolsep}{0in}
-
-% Custom colors
-\definecolor{primary}{RGB}{0, 102, 204}
-
-\hypersetup{
-    colorlinks=true,
-    linkcolor=primary,
-    urlcolor=primary,
-    citecolor=primary
-}
-
-\begin{document}
-"""
-
-LATEX_FOOTER = r"""
-\end{document}
-"""
-
-system_prompt_full = f"""
-You are an expert LaTeX generator for professional resumes. Generate clean, modern, and professional LaTeX code based on resume data.
-
-You must use this header provided:
-{LATEX_HEADER}
-You must use this footer provided:
-{LATEX_FOOTER}
+# Updated system prompts for template-based generation
+system_prompt_full = """
+You are an expert LaTeX content generator that creates professional resumes using pre-analyzed templates.
 
 **Your Task:**
-Generate complete LaTeX resume code that:
-1. Uses professional formatting with clean typography
-2. Organizes information logically (Header, Summary, Experience, Education, Skills, etc.)
-3. Handles missing data gracefully (skip empty sections)
-4. Uses consistent spacing and alignment
-5. Is ATS-friendly and printer-friendly
-6. Includes proper LaTeX escaping for special characters
+Generate complete LaTeX code by filling a template with user resume data while preserving the template's exact structure and formatting.
 
-**Guidelines:**
-- DO NOT CHANGE HEADER OR FOOTER
-- Use \\textbf{{}} for bold text, \\textit{{}} for italic
-- Escape special characters: & → \\&, % → \\%, $ → \\$, # → \\#, _ → \\_
-- Use \\href{{url}}{{text}} for links
-- Keep consistent date formatting
-- Use bullet points for descriptions
-- Maintain professional tone throughout
+**Critical Requirements:**
+1. ALWAYS include \\usepackage{url} in the preamble - this is mandatory
+2. Make sure that the code you generate matches with the template's structure exactly
+3. Use proper LaTeX escaping for special characters: & → \\&, % → \\%, $ → \\$, # → \\#, _ → \\_
+4. You do not have to keep sections that do not have data yet
+5. Maintain professional appearance and structure
+6. Follow the template's custom commands and formatting rules
+7. Preserve spacing and layout patterns from the original template
+8. Replace placeholder text with actual user data while maintaining formatting
 
-**Structure your response as JSON with:**
-{{
+**Template Integration:**
+- Use the provided template as the base structure
+- Replace placeholders like "Placeholder for experience name 1" with actual user data
+- Maintain all custom commands (\\CVSubheading, \\CVItem, etc.) exactly as defined
+- Keep the same spacing, fonts, and layout structure
+- Only modify content, never the template structure itself
+
+**Output Requirements:**
+Return complete, compilable LaTeX code that exactly matches the template's style and structure.
+
+**Response Format:**
+{
   "success": true,
-  "latexCode": "complete LaTeX code here",
-  "sections": {{
-    "header": "LaTeX code for header section",
-    "summary": "LaTeX code for about me section", 
-    "experience": "LaTeX code for experience section",
-    "education": "LaTeX code for education section",
-    "skills": "LaTeX code for skills section",
-    "custom": "LaTeX code for custom sections"
-  }}
-}}
+  "latexCode": "complete LaTeX document here",
+  "sections": {
+    "header": "LaTeX for header section",
+    "education": "LaTeX for education section",
+    "experience": "LaTeX for experience section",
+    "skills": "LaTeX for skills section"
+  },
+  "template_used": "template_name"
+}
 """
 
-system_prompt_incremental = f"""
-You are an expert LaTeX generator that handles incremental updates to resume sections.
+system_prompt_incremental = """
+You are an expert LaTeX generator that handles incremental updates to template-based resumes.
 
 **Your Task:**
-Update specific sections of existing LaTeX code based on change requests while maintaining consistency.
+Update specific sections of existing LaTeX code based on change requests while maintaining the template's exact structure and formatting consistency.
 
-You must use this header provided:
-{LATEX_HEADER}
-You must use this footer provided:
-{LATEX_FOOTER}
+**Critical Requirements:**
+1. ALWAYS ensure \\usepackage{url} remains in the preamble
+2. Preserve the template's formatting patterns exactly
+3. Only modify the specified section while keeping everything else unchanged
+4. Use the template's custom commands and patterns consistently
+5. Handle LaTeX escaping properly
+6. Maintain exact spacing patterns from template
 
-**Guidelines:**
-1. **For "update" changes**: Replace the specific section with new content
-2. **For "add" changes**: Add new entries to the appropriate section
-3. **For "delete" changes**: Remove specific entries from sections
-4. Maintain consistent formatting with existing code
-5. Preserve all other sections unchanged
-6. Handle LaTeX escaping properly
+**Update Types:**
+- "update": Replace the specific section with new content
+- "add": Add new entries to the appropriate section
+- "delete": Remove specific entries from sections
+
+**Template Consistency:**
+- Maintain exact spacing patterns from template
+- Use same custom commands as defined in template
+- Preserve formatting rules for dates, names, descriptions, etc.
+- Keep section structure and hierarchy identical
+- Only change content, never the template structure
 
 **Change Types:**
 - name: Update header with name information
@@ -193,13 +172,13 @@ You must use this footer provided:
 - customSections: Update custom resume sections
 
 **Structure your response as JSON with:**
-{{
+{
   "success": true,
   "latexCode": "complete updated LaTeX code",
-  "updatedSections": {{
+  "updatedSections": {
     "section_name": "updated LaTeX code for this section only"
-  }}
-}}
+  }
+}
 """
 
 # Create agents
@@ -218,58 +197,77 @@ incremental_update_agent = Agent(
 class LaTeXGeneratorAgent:
     """
     Main LaTeX generator agent that handles both full generation and incremental updates.
+    Works with parsed templates for consistent formatting.
     """
     
     def __init__(self):
         self.full_agent = full_generation_agent
         self.incremental_agent = incremental_update_agent
         self.section_cache = {}
+        self.template_cache = None
+        self.template_path = None
 
-    def escape_latex(self, text: str) -> str:
-        """Escape special LaTeX characters"""
-        if not text:
-            return ""
-        
-        replacements = {
-            '&': '\\&',
-            '%': '\\%', 
-            ': ': '\\',
-            '#': '\\#',
-            '^': '\\^{}',
-            '_': '\\_',
-            '{': '\\{',
-            '}': '\\}',
-            '~': '\\textasciitilde{}',
-            '\\': '\\textbackslash{}'
-        }
-        
-        for char, replacement in replacements.items():
-            text = text.replace(char, replacement)
-        
-        return text
-
-    async def generate_full_latex(self, data: ResumeData) -> LaTeXGenerationResult:
+    async def get_or_create_template(self, template_path: str) -> str:
         """
-        Generate complete LaTeX code for the entire resume.
+        Get template from cache or parse it using simple_template_parser_agent.
+        
+        Args:
+            template_path: Path to the template file
+            
+        Returns:
+            Parsed template content
+        """
+        # If we have a cached template and it's the same path, use it
+        if self.template_cache and self.template_path == template_path:
+            return self.template_cache
+        
+        # Otherwise, parse the template using simple_template_parser_agent
+        try:
+            template_content = await analyze_template_file(template_path)
+            self.template_cache = template_content
+            self.template_path = template_path
+            return template_content
+        except Exception as e:
+            raise Exception(f"Failed to parse template: {str(e)}")
+
+    async def generate_full_latex(self, data: ResumeData, template_path: str) -> LaTeXGenerationResult:
+        """
+        Generate complete LaTeX code for the entire resume using a template.
         
         Args:
             data: Complete resume data
+            template_path: Path to the template file
             
         Returns:
             LaTeXGenerationResult with complete LaTeX code and sections
         """
         try:
+            # Get or create template
+            template_content = await self.get_or_create_template(template_path)
+            
             # Prepare data for the agent
             data_dict = data.model_dump()
             
             prompt = f"""
-            Generate professional LaTeX resume code for the following data:
+            Generate professional LaTeX resume code using this template and user data:
             
+            **Template Content:**
+            {template_content}
+            
+            **Resume Data:**
             {json.dumps(data_dict, indent=2)}
             
-            Create a clean, modern resume layout with proper sections and formatting.
-            Handle empty fields gracefully by skipping them.
-            Use professional typography and consistent spacing.
+            **Instructions:**
+            1. Use the provided template as the base structure
+            2. Replace all placeholder text with actual user data while maintaining exact formatting
+            3. Keep all custom commands (\\CVSubheading, \\CVItem, etc.) exactly as defined
+            4. Maintain the same spacing, fonts, and layout structure
+            5. Only modify content, never the template structure itself
+            6. Handle empty data gracefully by keeping placeholder structure for empty sections
+            7. Ensure \\usepackage{{url}} is present
+            8. Use proper LaTeX escaping for special characters
+            
+            Create a complete, compilable LaTeX document that looks exactly like it was created with the original template.
             """
             
             result = await self.full_agent.run(prompt)
@@ -291,7 +289,8 @@ class LaTeXGeneratorAgent:
     async def update_latex_incremental(self, 
                                      current_latex: str,
                                      update: UpdateRequest,
-                                     data: ResumeData) -> LaTeXGenerationResult:
+                                     data: ResumeData,
+                                     template_path: str) -> LaTeXGenerationResult:
         """
         Update LaTeX code incrementally based on a specific change.
         
@@ -299,16 +298,23 @@ class LaTeXGeneratorAgent:
             current_latex: Current complete LaTeX code
             update: The specific update request
             data: Complete current resume data for context
+            template_path: Path to the template file for consistency
             
         Returns:
             LaTeXGenerationResult with updated LaTeX code
         """
         try:
+            # Get template for context (to ensure formatting consistency)
+            template_content = await self.get_or_create_template(template_path)
+            
             # Prepare the update context
             data_dict = data.model_dump()
             
             prompt = f"""
-            Update the following LaTeX code based on this change:
+            Update the following LaTeX code based on this change while maintaining template consistency:
+            
+            **Template Content (for reference):**
+            {template_content}
             
             **Current LaTeX:**
             {current_latex}
@@ -321,8 +327,15 @@ class LaTeXGeneratorAgent:
             **Current Data Context:**
             {json.dumps(data_dict, indent=2)}
             
+            **Instructions:**
+            1. Use the template as a reference to maintain formatting consistency
+            2. Only modify the affected section while preserving everything else
+            3. Maintain exact spacing patterns and custom commands from the template
+            4. Keep the same structure and layout
+            5. Handle LaTeX escaping properly
+            6. Ensure the updated section follows the template's formatting rules
+            
             Generate the complete updated LaTeX code with the change applied.
-            Only modify the affected section while preserving formatting consistency.
             """
             
             result = await self.incremental_agent.run(prompt)
@@ -340,129 +353,46 @@ class LaTeXGeneratorAgent:
                 error=f"Incremental update failed: {str(e)}"
             )
 
-    def generate_latex_manually(self, data: ResumeData) -> str:
+    def generate_latex_manually(self, data: ResumeData, template_content: str) -> str:
         """
         Fallback manual LaTeX generation for when AI fails.
+        Uses template structure but fills in content manually.
         """
-        latex_parts = [LATEX_HEADER]
-        
-        # Header section
-        if data.name.firstName or data.name.lastName:
-            name = f"{data.name.firstName} {data.name.lastName}".strip()
-            latex_parts.append(f"\\begin{{center}}\n{{\\Large \\textbf{{{self.escape_latex(name)}}}}}\\\\[5pt]")
-            
-            # Contact information
-            contact_info = []
-            for contact in data.contact:
-                if contact.value:
-                    if contact.type.lower() == 'email':
-                        contact_info.append(f"\\href{{mailto:{contact.value}}}{{{self.escape_latex(contact.value)}}}")
-                    elif contact.type.lower() in ['linkedin', 'website', 'github']:
-                        contact_info.append(f"\\href{{{contact.value}}}{{{self.escape_latex(contact.value)}}}")
-                    else:
-                        contact_info.append(self.escape_latex(contact.value))
-            
-            if contact_info:
-                latex_parts.append(" | ".join(contact_info))
-            
-            latex_parts.append("\\end{center}")
-            latex_parts.append("")
-
-        # Summary/About Me section  
-        if data.aboutMe.description:
-            latex_parts.append("\\section{Summary}")
-            description = data.aboutMe.polishedDescription or data.aboutMe.description
-            latex_parts.append(self.escape_latex(description))
-            latex_parts.append("")
-
-        # Experience section
-        if data.experience:
-            latex_parts.append("\\section{Experience}")
-            for exp in data.experience:
-                if exp.position or exp.company:
-                    title = exp.position or exp.title or ""
-                    company = exp.company or ""
-                    start_date = exp.startDate or ""
-                    end_date = exp.endDate or "Present"
-                    
-                    latex_parts.append(f"\\textbf{{{self.escape_latex(title)}}} | {self.escape_latex(company)} \\hfill {self.escape_latex(start_date)} - {self.escape_latex(end_date)}\\\\")
-                    
-                    if exp.description:
-                        # Split description into bullet points
-                        desc_lines = exp.description.split('\n')
-                        if len(desc_lines) > 1:
-                            latex_parts.append("\\begin{itemize}[leftmargin=*]")
-                            for line in desc_lines:
-                                line = line.strip()
-                                if line:
-                                    latex_parts.append(f"\\item {self.escape_latex(line)}")
-                            latex_parts.append("\\end{itemize}")
-                        else:
-                            latex_parts.append(self.escape_latex(exp.description))
-                    
-                    latex_parts.append("\\vspace{8pt}")
-            latex_parts.append("")
-
-        # Education section
-        if data.education:
-            latex_parts.append("\\section{Education}")
-            for edu in data.education:
-                if edu.degree or edu.institution:
-                    degree = edu.degree or ""
-                    institution = edu.institution or ""
-                    grad_date = edu.graduationDate or edu.endDate or ""
-                    
-                    latex_parts.append(f"\\textbf{{{self.escape_latex(degree)}}} | {self.escape_latex(institution)} \\hfill {self.escape_latex(grad_date)}\\\\")
-                    
-                    if edu.gpa:
-                        latex_parts.append(f"GPA: {self.escape_latex(edu.gpa)}\\\\")
-                    
-                    if edu.description:
-                        latex_parts.append(self.escape_latex(edu.description))
-                    
-                    latex_parts.append("\\vspace{8pt}")
-            latex_parts.append("")
-
-        # Skills section
-        if data.skills:
-            latex_parts.append("\\section{Skills}")
-            skills_list = []
-            for skill in data.skills:
-                skill_name = skill.name or skill.skill
-                if skill_name:
-                    skills_list.append(self.escape_latex(skill_name))
-            
-            if skills_list:
-                latex_parts.append(", ".join(skills_list))
-            latex_parts.append("")
-
-        # Custom sections
-        if data.customSections:
-            for section in data.customSections:
-                if section.title and section.content:
-                    latex_parts.append(f"\\section{{{self.escape_latex(section.title)}}}")
-                    latex_parts.append(self.escape_latex(section.content))
-                    latex_parts.append("")
-
-        latex_parts.append(LATEX_FOOTER)
-        
-        return "\n".join(latex_parts)
+        # This is a simplified fallback - in practice, you might want to implement
+        # a more sophisticated template-based manual generation
+        return template_content
 
     async def process_request(self, request: LaTeXGenerationRequest) -> LaTeXGenerationResult:
         """
         Main entry point for processing LaTeX generation requests.
         """
+        if not request.template_path:
+            return LaTeXGenerationResult(
+                success=False,
+                latexCode="",
+                error="Template path is required for template-based generation"
+            )
+        
         if request.type == "full":
-            result = await self.generate_full_latex(request.data)
+            result = await self.generate_full_latex(request.data, request.template_path)
             
             # Fallback to manual generation if AI fails
             if not result.success:
-                manual_latex = self.generate_latex_manually(request.data)
-                result = LaTeXGenerationResult(
-                    success=True,
-                    latexCode=manual_latex,
-                    sections=self.section_cache
-                )
+                try:
+                    template_content = await self.get_or_create_template(request.template_path)
+                    manual_latex = self.generate_latex_manually(request.data, template_content)
+                    result = LaTeXGenerationResult(
+                        success=True,
+                        latexCode=manual_latex,
+                        sections=self.section_cache,
+                        template_used=request.template_path
+                    )
+                except Exception as e:
+                    result = LaTeXGenerationResult(
+                        success=False,
+                        latexCode="",
+                        error=f"Manual generation also failed: {str(e)}"
+                    )
             
             return result
             
@@ -477,18 +407,28 @@ class LaTeXGeneratorAgent:
             result = await self.update_latex_incremental(
                 request.currentLatex,
                 request.update,
-                request.data
+                request.data,
+                request.template_path
             )
             
             # Fallback to full regeneration if incremental fails
             if not result.success:
-                result = await self.generate_full_latex(request.data)
+                result = await self.generate_full_latex(request.data, request.template_path)
                 if not result.success:
-                    manual_latex = self.generate_latex_manually(request.data)
-                    result = LaTeXGenerationResult(
-                        success=True,
-                        latexCode=manual_latex
-                    )
+                    try:
+                        template_content = await self.get_or_create_template(request.template_path)
+                        manual_latex = self.generate_latex_manually(request.data, template_content)
+                        result = LaTeXGenerationResult(
+                            success=True,
+                            latexCode=manual_latex,
+                            template_used=request.template_path
+                        )
+                    except Exception as e:
+                        result = LaTeXGenerationResult(
+                            success=False,
+                            latexCode="",
+                            error=f"All generation methods failed: {str(e)}"
+                        )
             
             return result
         
@@ -513,7 +453,8 @@ async def generate_latex(request_data: Dict[str, Any]) -> Dict[str, Any]:
                 "type": "full" | "incremental",
                 "data": ResumeData,
                 "update": UpdateRequest (for incremental),
-                "currentLatex": str (for incremental)
+                "currentLatex": str (for incremental),
+                "template_path": str (required)
             }
     
     Returns:
@@ -531,6 +472,7 @@ async def generate_latex(request_data: Dict[str, Any]) -> Dict[str, Any]:
             "error": f"Request processing failed: {str(e)}"
         }
 
+# Updated sample request with template path
 sample_req = {
   "type": "full",
   "data": {
@@ -541,7 +483,8 @@ sample_req = {
     "experience": [],
     "skills": [],
     "customSections": []
-  }
+  },
+  "template_path": "backend/templates/default_resume.tex"
 }
 
 # async def main():
