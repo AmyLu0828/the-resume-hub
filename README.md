@@ -1,4 +1,5 @@
-# What is The Resume Hub?
+#The Resume Hub (IN PROGRESS)
+## What is The Resume Hub?
 
 **Craft professional, polished resumes  — no LaTeX expertise required.**
 
@@ -28,7 +29,7 @@ The Resume Hub transforms your raw experiences into beautifully formatted, profe
 - **One-Click Polishing**: Enhance any section with AI assistance
 - **Custom Sections**: Add specialized categories for your unique background
 
-# Setup Instructions
+## Setup Instructions
 
 1. Clone Repository
 
@@ -64,7 +65,7 @@ cd backend
 python main.py
 ```
 
-# Project Structure
+## Project Structure
 
 ```bash
 backend/
