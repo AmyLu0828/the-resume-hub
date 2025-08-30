@@ -1,4 +1,4 @@
-# The Resume Hub (IN PROGRESS)
+# The Resume Hub V0.5 (IN PROGRESS)
 
 **Craft professional, polished resumes  — no LaTeX expertise required.**
 
