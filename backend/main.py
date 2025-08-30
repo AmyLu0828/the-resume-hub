@@ -32,6 +32,7 @@ import asyncio
 from models.resume_models import ResumeData, UpdateMessage, PolishRequest
 from agents.improvement_agent import improve_update
 from agents.latex_agent import generate_latex
+from agents.latex_generator2 import generator_singleton
 from services.pdf_service import PDFService
 
 # Initialize FastAPI app
@@ -92,30 +93,40 @@ async def polish_content(request: PolishRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error improving content: {str(e)}")
-"""
-FastAPI routes for LaTeX generation and PDF compilation
-"""
-
-@app.post("/api/generate-latex")
-async def generate_latex_endpoint(request: dict):
-    """
-    Generate LaTeX code (full or incremental)
-    
-    request_data: Dictionary with format:
-        {
-           "type": "full" | "incremental",
-            "data": ResumeData,
-            "update": UpdateRequest (for incremental),
-            "currentLatex": str (for incremental),
-            "template_path": str (required)
-        }
-    """
+# New endpoints for template scraping and incremental updates using the new orchestrator
+@app.post("/api/template/scrape")
+async def scrape_template_endpoint(payload: dict | None = None):
     try:
-        result = await generate_latex(request)
-        print(result)
-        return result
+        # Scrape and cache parts from default template
+        result = await generator_singleton.handle_request({"type": "scrape"})
+        return JSONResponse(content=jsonable_encoder(result))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LaTeX generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Template scraping failed: {str(e)}")
+
+
+class OrchestratorRequest(BaseModel):
+    type: str  # "header" | "section"
+    action: Optional[str] = "update"  # "update" | "add" | "delete"
+    data: dict
+
+
+@app.post("/api/latex-update")
+async def latex_update_endpoint(req: OrchestratorRequest):
+    """
+    Accepts the new request shape and routes to the async latex_generator orchestrator.
+    Example body:
+    {
+      "type": "header" | "section",
+      "action": "update" | "add" | "delete",
+      "data": { ... }
+    }
+    """
+    
+    try:
+        result = await generator_singleton.handle_request(req.model_dump())
+        return JSONResponse(content=jsonable_encoder(result))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
 
 from pydantic import BaseModel
 
@@ -291,34 +302,7 @@ async def health_check():
             }
         }
 
-
-# async def test_compile_latex_to_pdf():
-#     minimal_latex = r"""
-#     \documentclass{article}
-#     \begin{document}
-#     Hello, World!
-#     \end{document}
-#     """
-#     try:
-#         pdf_bytes = await compile_latex_to_pdf(minimal_latex)
-#         assert isinstance(pdf_bytes, bytes), "Output is not bytes"
-#         assert len(pdf_bytes) > 0, "PDF output is empty"
-
-#         # Save PDF to disk
-#         output_path = "output_test.pdf"
-#         with open(output_path, "wb") as f:
-#             f.write(pdf_bytes)
-#         print(f"Test passed: PDF generated and saved to {output_path}")
-#     except Exception as e:
-#         print(f"Test failed: {e}")
-
-
-# if __name__ == "__main__":
-#     asyncio.run(test_compile_latex_to_pdf())
-
-if __name__ == "__main__":
-    #await compile_latex_to_pdf("\\documentclass[a4paper,10pt]{article}\n\\usepackage[margin=1in]{geometry}\n\\usepackage{enumitem}\n\\usepackage{hyperref}\n\\usepackage{titlesec}\n\\usepackage{parskip}\n\\titleformat{\\section}{\\Large\\bfseries}{}{0em}{} \\titlespacing{\\section}{0em}{1em}{0.5em}\n\\titleformat{\\subsection}[runin]{\\bfseries}{}{0em}{} \\titlespacing{\\subsection}{0em}{0em}{0.5em}\n\\begin{document}\n\n\\begin{center}\n\\textbf{\\LARGE [INSERT NAME HERE]} \\\\\n\\textit{Professional Title / Role} \\\\\n\\end{center}\n\n\\section*{About Me}\n\\textit{I am Amy, a dedicated professional with a passion for excellence and a commitment to enhancing the customer experience.}\n\n\\end{document}")
-    
+if __name__ == "__main__":    
     import uvicorn
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

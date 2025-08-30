@@ -1,12 +1,14 @@
+//PDFPreview.tsx - FIXED VERSION
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ResumeData } from '@/types/resume';
-import { FileText, Eye, RefreshCw, Code } from 'lucide-react';
+import { FileText, Eye, RefreshCw, Code, CheckCircle } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 interface PDFPreviewProps {
   data: ResumeData;
-  lastUpdate?: {
+  // FIXED: Change to explicit trigger instead of auto-detection
+  onSubmitUpdate?: {
     section: string;
     entryId: string;
     changeType: string;
@@ -14,277 +16,226 @@ interface PDFPreviewProps {
   } | null;
 }
 
-export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
+export function PDFPreview({ data, onSubmitUpdate }: PDFPreviewProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [latexCode, setLatexCode] = useState<string>('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Show LaTeX by default per requirements
   const [showLatex, setShowLatex] = useState(true);
   const [compileStats, setCompileStats] = useState({ updates: 0, lastDuration: 0 });
   const [hasGeneratedPreview, setHasGeneratedPreview] = useState(false);
+  const [isTemplateScraped, setIsTemplateScraped] = useState(false);
+  const [isScrapingTemplate, setIsScrapingTemplate] = useState(false);
 
-  // Track LaTeX sections for incremental updates
-  const latexSectionsRef = useRef<Map<string, string>>(new Map());
   const isInitializedRef = useRef(false);
 
-  // Initialize with full LaTeX generation
+  // FIXED: Remove automatic change detection - only use explicit triggers
+  const scrapeTemplate = async () => {
+    if (isTemplateScraped) return;
+
+    try {
+      console.log("Scraping template...");
+      setIsScrapingTemplate(true);
+      const response = await fetch('/api/template/scrape', { method: 'POST' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      if (result.success) {
+        setIsTemplateScraped(true);
+        console.log("Template scraped successfully");
+      } else {
+        throw new Error(result.error || 'Template scraping failed');
+      }
+    } catch (err) {
+      console.error('Error scraping template:', err);
+      setError(err instanceof Error ? err.message : 'Failed to scrape template');
+    } finally {
+      setIsScrapingTemplate(false);
+    }
+  };
+
   const initializeLatex = async () => {
-    if (!hasData(data)) {
-      console.log("No data available for LaTeX generation");
+    if (!hasData(data) || !isTemplateScraped) {
+      console.log("No data or template not scraped");
       return;
     }
 
-    console.log("Starting full LaTeX initialization...");
+    console.log("Starting header initialization...");
     setIsUpdating(true);
     setError(null);
-    
-    // Generate LaTeX code (full or incremental)
-    
-    // request_data: Dictionary with format:
-    //     {
-    //        "type": "full" | "incremental",
-    //         "data": ResumeData,
-    //         "update": UpdateRequest (for incremental),
-    //         "currentLatex": str (for incremental),
-    //         "template_path": str (required)
-    //     }
-    
+
     try {
-      const response = await fetch('/api/generate-latex', {
+      await scrapeTemplate();
+
+      const headerPayload = {
+        type: 'header',
+        action: 'update',
+        data: {
+          name: data.name,
+          contact: data.contact,
+        },
+      };
+
+      const response = await fetch('/api/latex-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'full',
-          data: data,
-          template_path: "templates/default_resume.tex"
-        }),
+        body: JSON.stringify(headerPayload),
       });
-
-      console.log("LaTeX generation response:", response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("LaTeX generation failed:", errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
-      console.log("LaTeX generation result:", { success: result.success, hasLatexCode: !!result.latexCode });
+      console.log("Header update result:", result);
 
       if (result.success && result.latexCode) {
         setLatexCode(result.latexCode);
-
-        // Store section mappings for future incremental updates
-        if (result.sections) {
-          latexSectionsRef.current = new Map(Object.entries(result.sections));
-        }
-
         isInitializedRef.current = true;
         setHasGeneratedPreview(true);
-        console.log("LaTeX initialization completed successfully");
+        console.log("Header initialization completed successfully");
       } else {
-        throw new Error(result.error || 'No LaTeX code returned from server');
+        throw new Error(result.error || 'No LaTeX code returned from header update');
       }
     } catch (err) {
-      console.error('Error initializing LaTeX:', err);
-      setError(err instanceof Error ? err.message : 'Failed to initialize LaTeX');
+      console.error('Error initializing header:', err);
+      setError(err instanceof Error ? err.message : 'Failed to initialize header');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // Incremental LaTeX update
-  const updateLatexIncremental = async (updateInfo: any) => {
+  const updateLatexSection = async (updateInfo: any) => {
+    if (!isTemplateScraped) {
+      console.log("Template not scraped, scraping first...");
+      await scrapeTemplate();
+    }
+
     if (!isInitializedRef.current) {
-      console.log("Not initialized, falling back to full generation");
+      console.log("Not initialized, falling back to header initialization");
       await initializeLatex();
       return;
     }
 
-    console.log("Starting incremental LaTeX update...");
+    console.log("Starting section update...");
+    console.log("Update info received:", JSON.stringify(updateInfo, null, 2));
+    
     setIsUpdating(true);
     setError(null);
     const startTime = performance.now();
 
     try {
-      const response = await fetch('/api/generate-latex', {
+      let sectionData;
+      const sectionName = updateInfo.section;
+      
+      console.log("Section name:", sectionName);
+      console.log("Current data keys:", Object.keys(data));
+      
+      switch (sectionName) {
+        case 'aboutMe':
+          sectionData = data.aboutMe;
+          break;
+        case 'education':
+          sectionData = data.education;
+          break;
+        case 'experience':
+          sectionData = data.experience;
+          break;
+        case 'skills':
+          sectionData = data.skills;
+          break;
+        case 'customSections':
+          sectionData = data.customSections;
+          break;
+        default:
+          console.warn("Unknown section:", sectionName);
+          sectionData = null;
+      }
+      
+      console.log("Section data extracted:", JSON.stringify(sectionData, null, 2));
+
+      const sectionPayload = {
+        type: 'section',
+        action: updateInfo.changeType,
+        data: {
+          section: updateInfo.section,
+          entry: sectionData,
+        },
+      };
+
+      console.log("Payload being sent:", JSON.stringify(sectionPayload, null, 2));
+
+      const response = await fetch('/api/latex-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'incremental',
-          update: updateInfo,
-          currentLatex: latexCode,
-          data: data,
-          template_path: "templates/default_resume.tex"
-        }),
+        body: JSON.stringify(sectionPayload),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Incremental update failed:", errorText);
+        console.error("Backend error response:", errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
+      console.log("Backend response:", result);
 
       if (result.success && result.latexCode) {
         setLatexCode(result.latexCode);
-
-        // Update section mappings
-        if (result.updatedSections) {
-          Object.entries(result.updatedSections).forEach(([key, value]) => {
-            latexSectionsRef.current.set(key, value as string);
-          });
-        }
 
         const duration = performance.now() - startTime;
         setCompileStats(prev => ({
           updates: prev.updates + 1,
           lastDuration: Math.round(duration)
         }));
-        console.log("Incremental update completed successfully");
+        console.log("Section update completed successfully");
       } else {
-        throw new Error(result.error || 'No LaTeX code returned from incremental update');
+        throw new Error(result.error || 'No LaTeX code returned from section update');
       }
     } catch (err) {
-      console.error('Error updating LaTeX incrementally:', err);
-      console.log("Falling back to full regeneration...");
-      // Fallback to full regeneration
+      console.error('Error updating section:', err);
+      console.log("Falling back to header regeneration...");
       await initializeLatex();
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // Compile LaTeX to PDF with improved error handling
-  const compileToPdf = async (latex: string) => {
-    if (!latex || latex.trim().length === 0) {
-      console.error("No LaTeX code provided for compilation");
-      setError("No LaTeX code available for compilation");
+  // FIXED: Only process explicit submit triggers, not data changes
+  useEffect(() => {
+    if (!onSubmitUpdate) {
       return;
     }
 
-    try {
-      console.log("=== PDF COMPILATION STARTED ===");
-      console.log("LATEX CODE LENGTH:", latex.length, "characters");
+    console.log("Processing explicit submit update:", onSubmitUpdate);
+    
+    if (onSubmitUpdate.section === 'header') {
+      initializeLatex();
+    } else {
+      updateLatexSection(onSubmitUpdate);
+    }
+    
+  }, [onSubmitUpdate]); // FIXED: Only depend on explicit submit triggers
 
-      const requestBody = { latexCode: latex };
-      const startTime = Date.now();
+  // FIXED: Add method to manually trigger updates (call this from parent on submit)
+  const handleManualUpdate = async (section: string, changeType: string = 'update') => {
+    console.log(`Manual update triggered for section: ${section}`);
+    
+    const updateInfo = {
+      section,
+      entryId: 'current',
+      changeType,
+      timestamp: Date.now()
+    };
 
-      const response = await fetch('/api/compile-latex', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const responseTime = Date.now() - startTime;
-      console.log("RESPONSE TIME:", responseTime, "ms");
-      console.log("RESPONSE STATUS:", response.status, response.statusText);
-
-      if (!response.ok) {
-        let errorDetail = 'Unknown error';
-        const contentType = response.headers.get('content-type');
-
-        try {
-          if (contentType && contentType.includes('application/json')) {
-            const errorData = await response.json();
-            errorDetail = errorData.message || errorData.error || JSON.stringify(errorData);
-            console.error("ERROR RESPONSE (JSON):", errorData);
-          } else {
-            const errorText = await response.text();
-            errorDetail = errorText.substring(0, 500);
-            console.error("ERROR RESPONSE (TEXT):", errorText);
-          }
-        } catch (parseError) {
-          console.error("Could not parse error response:", parseError);
-        }
-
-        throw new Error(`PDF compilation failed (${response.status}): ${errorDetail}`);
-      }
-
-      // Check if response is actually a PDF
-      const contentType = response.headers.get('content-type');
-      console.log("RESPONSE CONTENT-TYPE:", contentType);
-
-      if (!contentType || !contentType.includes('application/pdf')) {
-        console.warn("⚠️ Unexpected content type. Expected PDF, got:", contentType);
-        // Still try to process as blob, but log warning
-      }
-
-      const blob = await response.blob();
-      console.log("BLOB TYPE:", blob.type);
-      console.log("BLOB SIZE:", blob.size, "bytes");
-
-      if (blob.size === 0) {
-        throw new Error("Received empty PDF blob");
-      }
-
-      // Additional PDF validation
-      if (blob.type === 'application/pdf' || blob.type === 'application/octet-stream') {
-        console.log("✓ Valid PDF blob received");
-      } else {
-        console.warn("⚠️ Unexpected blob type:", blob.type);
-      }
-
-      // Clean up previous URL
-      if (pdfUrl) {
-        console.log("Cleaning up previous PDF URL");
-        URL.revokeObjectURL(pdfUrl);
-      }
-
-      const url = URL.createObjectURL(blob);
-      console.log("Created object URL for PDF");
-      setPdfUrl(url);
-      setError(null); // Clear any previous errors
-
-      console.log("=== PDF COMPILATION COMPLETED SUCCESSFULLY ===");
-
-    } catch (err) {
-      console.error('=== PDF COMPILATION FAILED ===');
-      console.error('Error details:', err);
-
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(`PDF compilation failed: ${errorMessage}`);
-
-      // Clear PDF URL on error
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-        setPdfUrl(null);
-      }
+    if (section === 'header') {
+      await initializeLatex();
+    } else {
+      await updateLatexSection(updateInfo);
     }
   };
 
-  // Auto-update when user-submitted changes arrive
-  useEffect(() => {
-    if (!hasData(data)) {
-      console.log("No data, clearing preview state");
-      setPdfUrl(null);
-      setLatexCode('');
-      isInitializedRef.current = false;
-      setHasGeneratedPreview(false);
-      return;
-    }
-
-    // If there is a submitted update, perform incremental (will fall back to full init)
-    if (lastUpdate) {
-      console.log("Processing submitted update:", lastUpdate);
-      updateLatexIncremental(lastUpdate);
-    }
-  }, [data, lastUpdate]);
-
-  // Cleanup URLs on unmount
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) {
-        console.log("Cleaning up PDF URL on component unmount");
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [pdfUrl]);
-
+  // Rest of your existing helper functions...
   const hasData = (resumeData: ResumeData) => {
     return (
       resumeData.name.firstName ||
@@ -298,8 +249,6 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
     );
   };
 
-  // Removed download handler per requirements (no Download button)
-
   const copyLatexCode = () => {
     if (latexCode) {
       navigator.clipboard.writeText(latexCode);
@@ -307,7 +256,6 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
   };
 
   const generatePdf = async () => {
-    // Generate final high-quality PDF from backend explicitly
     try {
       setIsUpdating(true);
       const response = await fetch('/api/generate-final-pdf', {
@@ -333,6 +281,15 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        console.log("Cleaning up PDF URL on component unmount");
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
+
   return (
     <div className="h-full flex flex-col">
       {/* Header with controls */}
@@ -349,6 +306,28 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
         </div>
 
         <div className="flex gap-2">
+          <Button
+            variant={isTemplateScraped ? "default" : "outline"}
+            size="sm"
+            onClick={scrapeTemplate}
+            disabled={isScrapingTemplate || isTemplateScraped}
+            className="transition-all"
+          >
+            {isScrapingTemplate ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Scraping...
+              </>
+            ) : isTemplateScraped ? (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Template Scraped
+              </>
+            ) : (
+              'Scrape Template'
+            )}
+          </Button>
+
           <Button
             variant={showLatex ? "default" : "outline"}
             size="sm"
@@ -378,7 +357,7 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
         </div>
       </div>
 
-      {/* Preview area */}
+      {/* Preview area - Your existing JSX */}
       <Card className="flex-1 overflow-hidden bg-white shadow-lg">
         {error ? (
           <div className="h-full flex items-center justify-center text-center p-8">
@@ -410,7 +389,7 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
                 {isInitializedRef.current ? 'Updating LaTeX...' : 'Generating LaTeX...'}
               </p>
               <p className="text-sm text-gray-400 mt-1">
-                {isInitializedRef.current ? 'Incremental update in progress' : 'Initial generation'}
+                {isInitializedRef.current ? 'Section update in progress' : 'Header initialization'}
               </p>
             </div>
           </div>
@@ -461,10 +440,10 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
           <div className="h-full flex items-center justify-center text-center p-8">
             <div className="text-gray-500">
               <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg mb-2">Processing...</p>
-              <p className="text-sm text-gray-400 mb-4">
+              <div className="text-lg mb-2">Processing...</div>
+              <div className="text-sm text-gray-400 mb-4">
                 Your resume preview is being prepared
-              </p>
+              </div>
               <Button onClick={initializeLatex} variant="outline">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Regenerate
@@ -476,3 +455,33 @@ export function PDFPreview({ data, lastUpdate }: PDFPreviewProps) {
     </div>
   );
 }
+
+// FIXED: Updated parent component integration example
+/*
+// In your parent component (wherever PDFPreview is used):
+
+const [submitTrigger, setSubmitTrigger] = useState(null);
+
+// When "Submit Header" button is clicked:
+const handleSubmitHeader = () => {
+  setSubmitTrigger({
+    section: 'header',
+    entryId: 'current',
+    changeType: 'update',
+    timestamp: Date.now()
+  });
+};
+
+// When "Submit About Me" button is clicked:
+const handleSubmitAboutMe = () => {
+  setSubmitTrigger({
+    section: 'aboutMe',
+    entryId: 'current',
+    changeType: 'update',
+    timestamp: Date.now()
+  });
+};
+
+// Usage:
+<PDFPreview data={resumeData} onSubmitUpdate={submitTrigger} />
+*/

@@ -1,11 +1,4 @@
-%------------------------------------------------------------------------------
-% CV in Latex
-% Author : Charles Rambo
-% Based off of: https://github.com/sb2nov/resume and Jake's Resume on Overleaf
-% Most recently updated version may be found at https://github.com/fizixmastr 
-% License : MIT
-%------------------------------------------------------------------------------
-
+%PART 1
 \documentclass[A4,11pt]{article}
 %\documentclass[letterpaper,11pt]{article} %For use in US
 \usepackage{latexsym}
@@ -21,26 +14,6 @@
 \usepackage{tabularx}
 \usepackage{tikz}
 \input{glyphtounicode}
-
-\begin{comment}
-I am by no means a professional when it comes to the CV's/resumes, I have
-received various trainings on how to write a CV and resume from my high 
-school, as well as the Austin College and University of Eastern Finland's
-career counseling departments. As I intend to share my CV as a template, I 
-feel that it is my responsibility to provide explanations of my work.
-\end{comment}
-
-
-%-----FONT OPTIONS-------------------------------------------------------------
-\begin{comment}
-The font of the document will impact not just how readable it is, but how it is
-perceived. In the "The Craft of Scientific Writing" by Michael Alley, shares a
-common fonts for publication as well as their use. I have chosen to use
-Palatino for its legibility, some others are given below. There is far too much
-about typography to discus here. Note: serif fonts have short projecting
-strokes, sans-serif fonts are sans (without) these strokes.
-\end{comment}
-
 
 % serif
  \usepackage{palatino}
@@ -114,11 +87,13 @@ strokes, sans-serif fonts are sans (without) these strokes.
 \newcommand{\CVItemListStart}{\begin{itemize}}
 \newcommand{\CVItemListEnd}{\end{itemize}\vspace{-5pt}}
 
+
 %------------------------------------------------------------------------------
 % CV STARTS HERE  %
 %------------------------------------------------------------------------------
 \begin{document}
 
+%PART 2
 %-----HEADING------------------------------------------------------------------
 \begin{comment}
 In Europe it is common to include a picture of ones self in the CV. Select
@@ -148,40 +123,7 @@ which heading appropriate for the document you are creating.
     \href{https://github.com/fizixmastr}{\underline{github.com/fizixmastr}}
 \end{minipage}
 
-% Without picture
-%\begin{center}
-%    \textbf{\Huge \scshape Charles Rambo} \\ \vspace{1pt} %\scshape sets small capital letters, remove if desired
-%    \small +1 123-456-7890 $|$ 
-%    \href{mailto:you@provider.com}{\underline{you@provider.com}} $|$\\
-%    % Be sure to use a professional *personal* email address
-%    \href{https://linkedin.com/in/your-name-here}{\underline{linkedin.com/in/charles-rambo}} $|$
-%    % you should adjust you linked in profile name to be professional and recognizable
-%    \href{https://github.com/fizixmastr}{\underline{github.com/fizixmastr}}
-%\end{center}
-
-
-
-\begin{comment}
-This CV was written for specifically for positions I was applying for in
-academia, and then modified to be a template.
-
-A standard CV is about two pages long where as a resume in the US is one page.
-sections can be added and removed here with this in mind. In my experience, 
-education, and applicable work experience and skills are the most import things
-to include on a resume. For a CV the Europass CV suggests the categories: Work
-Experience, Education and Training, Language Skills, Digital Skills,
-Communication and Interpersonal Skills, Conferences and Seminars, Creative Works
-Driver's License, Hobbies and Interests, Honors and Awards, Management and
-Leadership Skills, Networks and Memberships, Organizational Skills, Projects,
-Publications, Recommendations, Social and Political Activities, Volunteering.
-
-Your goal is to convey a who, what , when, where, why for every item you share. 
-The who is obviously you, but I believe the rest should be done in that order.
-For example below. An employer cares most about the degree held and typically 
-less about the institution or where it is located (This is still good 
-information though). Whatever order you choose be consistent throughout.
-\end{comment}
-
+%PART 3
 %-----EDUCATION----------------------------------------------------------------
 \section{Education}
   \CVSubHeadingListStart
@@ -378,4 +320,5 @@ recommends.
  \end{itemize}
     
 %------------------------------------------------------------------------------
+%PART 4
 \end{document}

@@ -10,7 +10,8 @@ import { SkillsSection } from './sections/SkillsSection';
 import { CustomSectionsSection } from './sections/CustomSectionsSection';
 import { PDFPreview } from './PDFPreview';
 import { ResumeData, UpdateMessage } from '@/types/resume';
-import { FileText, User, GraduationCap, Briefcase, Phone, Code, Settings } from 'lucide-react';
+import { FileText, User, GraduationCap, Briefcase, Phone, Code, Settings, UploadCloud, Save } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const initialData: ResumeData = {
   name: { firstName: '', lastName: '' },
@@ -26,8 +27,8 @@ export function ResumeBuilder() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialData);
   const [isPolishing, setIsPolishing] = useState<string | null>(null);
 
-  // Track the last update for incremental LaTeX generation
-  const [lastUpdate, setLastUpdate] = useState<{
+  // FIXED: Change from lastUpdate to submitTrigger
+  const [submitTrigger, setSubmitTrigger] = useState<{
     section: string;
     entryId: string;
     changeType: string;
@@ -100,23 +101,86 @@ export function ResumeBuilder() {
       return newData;
     });
 
-    // Track this update for incremental LaTeX generation only when requested
-    if (update.triggerLatex) {
-      setLastUpdate({
-        section: update.section,
-        entryId: update.entryId || `${update.section}_${Date.now()}`,
-        changeType: update.changeType,
-        timestamp: Date.now()
-      });
-
-      console.log('Incremental LaTeX trigger:', {
-        section: update.section,
-        changeType: update.changeType,
-        entryId: update.entryId
-      });
-    }
+    // FIXED: Remove automatic LaTeX triggering - only manual submit now
+    console.log('Data updated:', {
+      section: update.section,
+      changeType: update.changeType,
+      entryId: update.entryId
+    });
 
   }, []);
+
+  // Scrape Template button handler
+  const handleScrapeTemplate = async () => {
+    try {
+      await fetch('/api/template/scrape', { method: 'POST' });
+    } catch (e) {
+      console.error('Failed to scrape template', e);
+    }
+  };
+
+  // FIXED: Updated header submit handler
+  const handleSubmitHeader = async () => {
+    console.log('Submitting header with data:', { name: resumeData.name, contact: resumeData.contact });
+    
+    setSubmitTrigger({
+      section: 'header',
+      entryId: 'header_bundle',
+      changeType: 'update',
+      timestamp: Date.now()
+    });
+  };
+
+  // FIXED: Add section submit handlers
+  const handleSubmitAboutMe = () => {
+    console.log('Submitting About Me section');
+    setSubmitTrigger({
+      section: 'aboutMe',
+      entryId: 'about',
+      changeType: 'update',
+      timestamp: Date.now()
+    });
+  };
+
+  const handleSubmitEducation = () => {
+    console.log('Submitting Education section');
+    setSubmitTrigger({
+      section: 'education',
+      entryId: 'education',
+      changeType: 'update',
+      timestamp: Date.now()
+    });
+  };
+
+  const handleSubmitExperience = () => {
+    console.log('Submitting Experience section');
+    setSubmitTrigger({
+      section: 'experience',
+      entryId: 'experience',
+      changeType: 'update',
+      timestamp: Date.now()
+    });
+  };
+
+  const handleSubmitSkills = () => {
+    console.log('Submitting Skills section');
+    setSubmitTrigger({
+      section: 'skills',
+      entryId: 'skills',
+      changeType: 'update',
+      timestamp: Date.now()
+    });
+  };
+
+  const handleSubmitCustomSections = () => {
+    console.log('Submitting Custom Sections');
+    setSubmitTrigger({
+      section: 'customSections',
+      entryId: 'customSections',
+      changeType: 'update',
+      timestamp: Date.now()
+    });
+  };
 
   const handlePolish = async (section: string, entryId: string, content: any) => {
     setIsPolishing(entryId);
@@ -186,8 +250,8 @@ export function ResumeBuilder() {
         return newData;
       });
 
-      // Track polishing as an update for LaTeX regeneration
-      setLastUpdate({
+      // FIXED: Auto-trigger LaTeX update after polishing
+      setSubmitTrigger({
         section: section,
         entryId: entryId,
         changeType: 'update',
@@ -220,11 +284,9 @@ export function ResumeBuilder() {
           </div>
           <p className="text-muted-foreground text-xl max-w-3xl mx-auto leading-relaxed">
             Create professional resumes with AI assistance and live LaTeX preview.
-            Changes appear instantly with incremental updates.
+            Submit each section to see updates in the preview.
           </p>
         </div>
-
-
 
         {/* Two-column layout */}
         <div className="grid lg:grid-cols-2 gap-8 h-[calc(100vh-300px)]">
@@ -235,83 +297,145 @@ export function ResumeBuilder() {
                 <div className="flex items-center gap-3 pb-4 border-b">
                   <User className="h-5 w-5 text-primary" />
                   <h2 className="text-xl font-semibold">Resume Information</h2>
-                  {lastUpdate && (
+                  {submitTrigger && (
                     <div className="ml-auto text-xs text-green-600 flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                      Live Updates Active
+                      Last Update: {submitTrigger.section}
                     </div>
                   )}
                 </div>
 
-                <NameSection
-                  data={resumeData.name}
-                  onUpdate={handleUpdate}
-                />
-
-                <AboutMeSection
-                  data={resumeData.aboutMe}
-                  onUpdate={handleUpdate}
-                  onPolish={handlePolish}
-                  isPolishing={isPolishing === 'about'}
-                />
-
-                <div className="flex items-center gap-3 pt-4">
-                  <Phone className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-medium">Contact Information</h3>
+                {/* Scrape template button */}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleScrapeTemplate} className="flex items-center gap-2">
+                    <UploadCloud className="h-4 w-4" />
+                    Scrape Template
+                  </Button>
                 </div>
-                <ContactSection
-                  data={resumeData.contact}
-                  onUpdate={handleUpdate}
-                />
 
-                <div className="flex items-center gap-3 pt-4">
-                  <GraduationCap className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-medium">Education</h3>
-                </div>
-                <EducationSection
-                  data={resumeData.education}
-                  onUpdate={handleUpdate}
-                  onPolish={handlePolish}
-                  isPolishing={isPolishing}
-                />
+                {/* Name + Contacts bundle with one Submit button */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50">
+                  <div className="flex items-center gap-3 pb-4 border-b border-gray-200 mb-6">
+                    <User className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-medium">Header Information</h3>
+                  </div>
 
-                <div className="flex items-center gap-3 pt-4">
-                  <Briefcase className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-medium">Experience</h3>
-                </div>
-                <ExperienceSection
-                  data={resumeData.experience}
-                  onUpdate={handleUpdate}
-                  onPolish={handlePolish}
-                  isPolishing={isPolishing}
-                />
+                  <NameSection data={resumeData.name} onUpdate={handleUpdate} />
 
-                <div className="flex items-center gap-3 pt-4">
-                  <Code className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-medium">Skills</h3>
-                </div>
-                <SkillsSection
-                  data={resumeData.skills}
-                  onUpdate={handleUpdate}
-                />
+                  <div className="flex items-center gap-3 pt-6 pb-4 border-b border-gray-200">
+                    <Phone className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-medium">Contact Information</h3>
+                  </div>
+                  <ContactSection data={resumeData.contact} onUpdate={handleUpdate} />
 
-                <div className="flex items-center gap-3 pt-4">
-                  <Settings className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-medium">Custom Sections</h3>
+                  <div className="flex justify-end pt-4">
+                    <Button onClick={handleSubmitHeader} className="flex items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Submit Header
+                    </Button>
+                  </div>
                 </div>
-                <CustomSectionsSection
-                  data={resumeData.customSections}
-                  onUpdate={handleUpdate}
-                />
+
+                {/* FIXED: About Me section with submit button */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50">
+                  <AboutMeSection
+                    data={resumeData.aboutMe}
+                    onUpdate={handleUpdate}
+                    onPolish={handlePolish}
+                    isPolishing={isPolishing === 'about'}
+                  />
+                  <div className="flex justify-end pt-4">
+                    <Button onClick={handleSubmitAboutMe} className="flex items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Submit About Me
+                    </Button>
+                  </div>
+                </div>
+
+                {/* FIXED: Education section with submit button */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50">
+                  <div className="flex items-center gap-3 pb-4 border-b border-gray-200 mb-6">
+                    <GraduationCap className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-medium">Education</h3>
+                  </div>
+                  <EducationSection
+                    data={resumeData.education}
+                    onUpdate={handleUpdate}
+                    onPolish={handlePolish}
+                    isPolishing={isPolishing}
+                  />
+                  <div className="flex justify-end pt-4">
+                    <Button onClick={handleSubmitEducation} className="flex items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Submit Education
+                    </Button>
+                  </div>
+                </div>
+
+                {/* FIXED: Experience section with submit button */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50">
+                  <div className="flex items-center gap-3 pb-4 border-b border-gray-200 mb-6">
+                    <Briefcase className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-medium">Experience</h3>
+                  </div>
+                  <ExperienceSection
+                    data={resumeData.experience}
+                    onUpdate={handleUpdate}
+                    onPolish={handlePolish}
+                    isPolishing={isPolishing}
+                  />
+                  <div className="flex justify-end pt-4">
+                    <Button onClick={handleSubmitExperience} className="flex items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Submit Experience
+                    </Button>
+                  </div>
+                </div>
+
+                {/* FIXED: Skills section with submit button */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50">
+                  <div className="flex items-center gap-3 pb-4 border-b border-gray-200 mb-6">
+                    <Code className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-medium">Skills</h3>
+                  </div>
+                  <SkillsSection
+                    data={resumeData.skills}
+                    onUpdate={handleUpdate}
+                  />
+                  <div className="flex justify-end pt-4">
+                    <Button onClick={handleSubmitSkills} className="flex items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Submit Skills
+                    </Button>
+                  </div>
+                </div>
+
+                {/* FIXED: Custom Sections with submit button */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50">
+                  <div className="flex items-center gap-3 pb-4 border-b border-gray-200 mb-6">
+                    <Settings className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-medium">Custom Sections</h3>
+                  </div>
+                  <CustomSectionsSection
+                    data={resumeData.customSections}
+                    onUpdate={handleUpdate}
+                  />
+                  <div className="flex justify-end pt-4">
+                    <Button onClick={handleSubmitCustomSections} className="flex items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Submit Custom Sections
+                    </Button>
+                  </div>
+                </div>
               </div>
             </ScrollArea>
           </Card>
 
-          {/* Right column - PDF preview with incremental updates */}
+          {/* FIXED: Right column - PDF preview with submit-based updates */}
           <Card className="p-6 shadow-medium">
             <PDFPreview
               data={resumeData}
-              lastUpdate={lastUpdate}
+              onSubmitUpdate={submitTrigger}
             />
           </Card>
         </div>

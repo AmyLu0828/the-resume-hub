@@ -39,7 +39,8 @@ export function ContactSection({ data, onUpdate }: ContactSectionProps) {
         entryId: contact.id,
         changeType: 'add',
         content: contact,
-        triggerLatex: true,
+        // Do NOT trigger LaTeX on add; use bundled submit button instead
+        triggerLatex: false,
       });
 
       setNewContact({ type: '', value: '' });
@@ -66,7 +67,8 @@ export function ContactSection({ data, onUpdate }: ContactSectionProps) {
       entryId: id,
       changeType: 'delete',
       content: null,
-      triggerLatex: true,
+      // Do NOT trigger LaTeX on delete; use bundled submit button instead
+      triggerLatex: false,
     });
   };
 

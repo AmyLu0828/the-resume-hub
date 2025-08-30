@@ -9,13 +9,13 @@ interface NameSectionProps {
 
 export function NameSection({ data, onUpdate }: NameSectionProps) {
     const handleChange = (field: keyof Name, value: string) => {
-        // Name changes should immediately trigger LaTeX incremental update
+        // Do NOT trigger LaTeX here; bunded submit will trigger header update
         onUpdate({
             section: 'name',
             entryId: 'name',
             changeType: 'update',
             content: { ...data, [field]: value },
-            triggerLatex: true,
+            triggerLatex: false,
         });
     };
 
