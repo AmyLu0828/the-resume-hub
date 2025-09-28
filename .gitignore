@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment and secret files
+.env
+.env.*            # 例如 .env.production, .env.local 等
+docker-compose.override.yml
+docker-compose.override.yaml
+secrets.yml
+*.secret
